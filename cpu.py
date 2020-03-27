@@ -2,14 +2,13 @@ import sys
 
 
 
-# SPRINT
-CMP = 0b10100111
-JMP = 0b01010100
-JEQ = 0b01010101
-JNE = 0b01010110
 
+# Work in progress
 Dict = {
-    "CMP": "0b10100111"
+    "CMP": "0b10100111",
+    "JMP": "0b01010100",
+    "JEQ": "0b01010101",
+    "JNE": "0b01010110"
 
 }
 
@@ -22,6 +21,12 @@ MUL = 0b10100010  # ALU opcode
 PUSH = 0b01000101 # Stack opcode
 POP = 0b01000110  # Stack opcode
 
+# THE SPRINT
+CMP = 0b10100111
+JMP = 0b01010100
+JEQ = 0b01010101
+JNE = 0b01010110
+
 
 
 class CPU:
@@ -32,34 +37,39 @@ class CPU:
         self.program_counter = 0  # Program counter
         self.ram = [0] * 256
         self.reg = [0] * 8  # Only vals b/t 0-255, bitwise AND results with 0xFF
-        self.reg[7] = 0xf4  # Reserved register: Stack pointer
+        self.reg[7] = 0xf4  #My Reserved register: Stack pointer
         # Stacks grow down?
         self.sp = self.reg[7]
-        # Flag value set by CMP: 0b00000LGE
+        # Flag value set by the CMP function code 0b00000LGE
         self.fl = 0b00000000
-        # SPRINT
-        self.dispatch_table[CMP] = self.handle_CMP
-        self.dispatch_table[JMP] = self.handle_JMP
-        self.dispatch_table[JEQ] = self.handle_JEQ
-        self.dispatch_table[JNE] = self.handle_JNE
 
+        # THE SPRINT
+        # TABLE deals with all the methods
         self.dispatch_table = {}
-        self.dispatch_table[HLT] = self.handle_HLT
-        self.dispatch_table[LDI] = self.handle_LDI
-        self.dispatch_table[PRN] = self.handle_PRN
-        self.dispatch_table[MUL] = self.handle_MUL
-        self.dispatch_table[PUSH] = self.handle_PUSH
-        self.dispatch_table[POP] = self.handle_POP
+        self.dispatch_table[CMP] = self.CMP_method
+        self.dispatch_table[JMP] = self.JMP_method
+        self.dispatch_table[JEQ] = self.JEQ_method
+        self.dispatch_table[JNE] = self.JNE_method
 
+        # Stuff from previous project that I have changed
+        self.dispatch_table[HLT] = self.HLT_method
+        self.dispatch_table[LDI] = self.LDI_method
+        self.dispatch_table[PRN] = self.PRN_method
+        self.dispatch_table[MUL] = self.MUL_method
+        self.dispatch_table[PUSH] = self.PUSH_method
+        self.dispatch_table[POP] = self.POP_method
 
-    def handle_HLT(self):
-        sys.exit(0)  # exit
+    # exits
+    def HLT_method(self):
+        sys.exit(0)
 
-    def handle_PRN(self):
+    #Prints numeric value stored in the given register.
+    def PRN_method(self):
         op_a = self.ram_read(self.program_counter + 1)
         print(self.ram[op_a])
 
-    def handle_MUL(self):
+    #Multiplies the values in two registers together and store the result in registerA.
+    def MUL_method(self):
         # Read values to multiply
         op_a = int(self.ram_read(self.program_counter + 1))  # RAM Register a
         op_b = int(self.ram_read(self.program_counter + 2))  # RAM Register b
@@ -69,26 +79,30 @@ class CPU:
         # Perform ALU computation, overwrite RAM register op_a
         self.ram_write(op_a, self.alu("MUL", op_a, op_b))
 
-    def handle_LDI(self):
+    #Sets the value of the register to the integers
+    def LDI_method(self):
         op_a = int(self.ram_read(self.program_counter + 2))  # val base10
         op_b = int(self.ram_read(self.program_counter + 1))  # Register base10
         self.ram_write(op_b, op_a)
 
-    def handle_PUSH(self):
+    #Push's the value in the given register on the stack.
+    def PUSH_method(self):
         # Decrement stack pointer
         self.sp -= 1
         # Copies value in register to SP address
         op_a = self.ram_read(self.ram_read(self.program_counter + 1))
         self.ram_write(self.sp, op_a)
 
-    def handle_POP(self):
+    #Pop's the value at the top of the stack into the given register.
+    def POP_method(self):
         # Copies val from self.sp address to register
         op_a = self.ram_read(self.program_counter + 1)
         self.ram_write(op_a, self.ram_read(self.sp))
         # Increment stack pointer
         self.sp += 1
 
-    def handle_CMP(self):
+    # Compare's the values in two registers.
+    def CMP_method(self):
         # Reads values to compare
         op_a = int(self.ram_read(self.program_counter + 1))  # RAM Register a
         op_b = int(self.ram_read(self.program_counter + 2))  # RAM Register b
@@ -98,18 +112,21 @@ class CPU:
         # Performs ALU computation: compare and set flag
         self.alu("CMP", op_a, op_b)
 
-    def handle_JMP(self):
+    # Jump to the address stored in the given register.
+    def JMP_method(self):
         # Set PC to address stored in given register
         op_a = int(self.ram_read(self.program_counter + 1))  # Register storing jump addr
         self.program_counter = self.ram_read(op_a)
 
-    def handle_JEQ(self):
+    # If equal flag is set(true), jump to the address stored in the given register.
+    def JEQ_method(self):
         # Jumps if Equality FLAG is True
         op_a = int(self.ram_read(self.program_counter + 1))  # Register storing jump addr
         if self.fl == 0b00000001:
             self.program_counter = self.ram_read(op_a)
 
-    def handle_JNE(self):
+    # If flag is clear(false, 0), jump to the address stored in the given register.
+    def JNE_method(self):
         # Jumps if Equality FLAG is False/0
         op_a = int(self.ram_read(self.program_counter + 1))  # Register storing jump addr
         if self.fl == 0b00000100:
@@ -117,6 +134,7 @@ class CPU:
         elif self.fl == 0b00000010:
             self.program_counter = self.ram_read(op_a)
 
+    # LOADS the file
     def load(self, filename):
         """Load a program into memory."""
         program = []
@@ -177,4 +195,31 @@ class CPU:
 
         print()
 
-    
+    def run(self):
+        """Run the CPU."""
+        while True:
+            # Instruction register
+            IR = self.ram[self.program_counter]
+
+            # Calculate PC increment value: get upper/high bits 6 & 7
+            operand_count = IR >> 6
+            instr_len = operand_count + 1
+
+            # THE KILLER Dispatch table
+            pre_exec_pc = self.program_counter
+            self.dispatch_table[IR]()
+            post_exec_pc = self.program_counter
+
+            #GOING TO BEAUTIFY THIS With a dictionary
+            # Increments PC if IR doesn't set the PC
+            if IR == JMP:
+                # Unconditionally don't increment PC
+                continue
+            elif (IR == JEQ) or (IR == JNE):
+                # Then if PC didn't jump during op_code execution
+                if post_exec_pc == pre_exec_pc:
+                    self.program_counter += instr_len
+                else:
+                    continue
+            else:
+                self.program_counter += instr_len
